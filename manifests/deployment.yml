@@ -1,0 +1,19 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: gaurvssrisnayainfra 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gaurvssrisnayainfra
+  template:
+    metadata:
+      labels:
+        app: gaurvssrisnayainfra 
+    spec:
+      containers:
+        - name: gaurvssrisnayainfra 
+          image: gssdevacr.azurecr.io/gaurvssrisnayainfra
+          ports:
+          - containerPort: 80
