@@ -32,12 +32,34 @@ stages:
         terraformVersion: 'latest'
 
     - powershell: |
+        $ErrorActionPreference = "Stop"
+
+        # ---- tflint ----
+        $tflintDir = "C:\tools\tflint"
+        if (-not (Test-Path "$tflintDir\tflint.exe")) {
+          New-Item -ItemType Directory -Force -Path $tflintDir | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/terraform-linters/tflint/releases/latest/download/tflint_windows_amd64.zip" -OutFile "$tflintDir\tflint.zip"
+          Expand-Archive -Path "$tflintDir\tflint.zip" -DestinationPath $tflintDir -Force
+          Remove-Item "$tflintDir\tflint.zip"
+        }
+        echo "##vso[task.prependpath]$tflintDir"
+
+        # ---- tfsec ----
+        $tfsecDir = "C:\tools\tfsec"
+        if (-not (Test-Path "$tfsecDir\tfsec.exe")) {
+          New-Item -ItemType Directory -Force -Path $tfsecDir | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/aquasecurity/tfsec/releases/latest/download/tfsec-windows-amd64.exe" -OutFile "$tfsecDir\tfsec.exe"
+        }
+        echo "##vso[task.prependpath]$tfsecDir"
+
+        # ---- checkov (needs python/pip already on agent) ----
+        pip install checkov --quiet
+      displayName: Install Security Tools
+
+    - powershell: |
         terraform version
-        where tflint
         tflint --version
-        where tfsec
         tfsec --version
-        where checkov
         checkov --version
       displayName: Verify Installed Tools
 
@@ -105,12 +127,34 @@ stages:
         terraformVersion: 'latest'
 
     - powershell: |
+        $ErrorActionPreference = "Stop"
+
+        # ---- tflint ----
+        $tflintDir = "C:\tools\tflint"
+        if (-not (Test-Path "$tflintDir\tflint.exe")) {
+          New-Item -ItemType Directory -Force -Path $tflintDir | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/terraform-linters/tflint/releases/latest/download/tflint_windows_amd64.zip" -OutFile "$tflintDir\tflint.zip"
+          Expand-Archive -Path "$tflintDir\tflint.zip" -DestinationPath $tflintDir -Force
+          Remove-Item "$tflintDir\tflint.zip"
+        }
+        echo "##vso[task.prependpath]$tflintDir"
+
+        # ---- tfsec ----
+        $tfsecDir = "C:\tools\tfsec"
+        if (-not (Test-Path "$tfsecDir\tfsec.exe")) {
+          New-Item -ItemType Directory -Force -Path $tfsecDir | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/aquasecurity/tfsec/releases/latest/download/tfsec-windows-amd64.exe" -OutFile "$tfsecDir\tfsec.exe"
+        }
+        echo "##vso[task.prependpath]$tfsecDir"
+
+        # ---- checkov (needs python/pip already on agent) ----
+        pip install checkov --quiet
+      displayName: Install Security Tools
+
+    - powershell: |
         terraform version
-        where tflint
         tflint --version
-        where tfsec
         tfsec --version
-        where checkov
         checkov --version
       displayName: Verify Installed Tools
 
@@ -178,12 +222,34 @@ stages:
         terraformVersion: 'latest'
 
     - powershell: |
+        $ErrorActionPreference = "Stop"
+
+        # ---- tflint ----
+        $tflintDir = "C:\tools\tflint"
+        if (-not (Test-Path "$tflintDir\tflint.exe")) {
+          New-Item -ItemType Directory -Force -Path $tflintDir | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/terraform-linters/tflint/releases/latest/download/tflint_windows_amd64.zip" -OutFile "$tflintDir\tflint.zip"
+          Expand-Archive -Path "$tflintDir\tflint.zip" -DestinationPath $tflintDir -Force
+          Remove-Item "$tflintDir\tflint.zip"
+        }
+        echo "##vso[task.prependpath]$tflintDir"
+
+        # ---- tfsec ----
+        $tfsecDir = "C:\tools\tfsec"
+        if (-not (Test-Path "$tfsecDir\tfsec.exe")) {
+          New-Item -ItemType Directory -Force -Path $tfsecDir | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/aquasecurity/tfsec/releases/latest/download/tfsec-windows-amd64.exe" -OutFile "$tfsecDir\tfsec.exe"
+        }
+        echo "##vso[task.prependpath]$tfsecDir"
+
+        # ---- checkov (needs python/pip already on agent) ----
+        pip install checkov --quiet
+      displayName: Install Security Tools
+
+    - powershell: |
         terraform version
-        where tflint
         tflint --version
-        where tfsec
         tfsec --version
-        where checkov
         checkov --version
       displayName: Verify Installed Tools
 
