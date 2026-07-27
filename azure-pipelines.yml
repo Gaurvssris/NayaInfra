@@ -104,7 +104,13 @@ stages:
         command: plan
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
         environmentServiceNameAzureRM: '$(serviceConnection)'
-
+    - task: TerraformTask@5
+      displayName: Terraform Apply
+      inputs:
+        provider: azurerm
+        command: apply
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
+        environmentServiceNameAzureRM: '$(serviceConnection)'
 ##############################################
 # QA
 ##############################################
