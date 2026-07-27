@@ -1,0 +1,193 @@
+
+
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  name: NayaInfra
+
+variables:
+  serviceConnection: 'NayaInfra'
+  backendStorageAccount: 'gssstrg'
+  backendContainer: 'gsscontainer'
+
+##########################################################
+# DEV
+##########################################################
+
+stages:
+
+- stage: Dev
+  displayName: "DEV Deployment"
+
+  jobs:
+
+  - job: DevTerraform
+    displayName: "Terraform Dev"
+
+    steps:
+
+    - checkout: self
+
+    - task: TerraformInstaller@1
+      inputs:
+        terraformVersion: 'latest'
+
+    - task: TerraformTask@5
+      displayName: Terraform Init
+      inputs:
+        provider: azurerm
+        command: init
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
+        backendServiceArm: '$(serviceConnection)'
+        backendAzureRmStorageAccountName: '$(backendStorageAccount)'
+        backendAzureRmContainerName: '$(backendContainer)'
+        backendAzureRmKey: 'dev.tfstate'
+
+    - script: terraform fmt -check -recursive
+      workingDirectory: $(System.DefaultWorkingDirectory)
+      displayName: Terraform Format
+
+    - task: TerraformTask@5
+      displayName: Terraform Validate
+      inputs:
+        provider: azurerm
+        command: validate
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
+
+    - script: |
+        tflint --init
+        tflint
+      displayName: TFLint
+      workingDirectory: $(System.DefaultWorkingDirectory)
+
+    - script: |
+        tfsec .
+      displayName: TFSEC
+      workingDirectory: $(System.DefaultWorkingDirectory)
+
+    - script: |
+        checkov -d .
+      displayName: Checkov
+      workingDirectory: $(System.DefaultWorkingDirectory)
+
+    - task: TerraformTask@5
+      displayName: Terraform Plan
+      inputs:
+        provider: azurerm
+        command: plan
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
+        environmentServiceNameAzureRM: '$(serviceConnection)'
+
+    - task: TerraformTask@5
+      displayName: Terraform Apply
+      inputs:
+        provider: azurerm
+        command: apply
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
+        commandOptions: '-auto-approve'
+        environmentServiceNameAzureRM: '$(serviceConnection)'
+
+##########################################################
+# QA
+##########################################################
+
+- stage: QA
+
+  dependsOn: Dev
+
+  displayName: QA Deployment
+
+  jobs:
+
+  - deployment: QADeploy
+
+    environment: QA
+
+    strategy:
+
+      runOnce:
+
+        deploy:
+
+          steps:
+
+          - checkout: self
+
+          - task: TerraformTask@5
+            inputs:
+              provider: azurerm
+              command: init
+              workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Qa'
+              backendServiceArm: '$(serviceConnection)'
+              backendAzureRmStorageAccountName: '$(backendStorageAccount)'
+              backendAzureRmContainerName: '$(backendContainer)'
+              backendAzureRmKey: 'qa.tfstate'
+
+          - task: TerraformTask@5
+            inputs:
+              provider: azurerm
+              command: plan
+              workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Qa'
+              environmentServiceNameAzureRM: '$(serviceConnection)'
+
+          - task: TerraformTask@5
+            inputs:
+              provider: azurerm
+              command: apply
+              workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Qa'
+              commandOptions: '-auto-approve'
+              environmentServiceNameAzureRM: '$(serviceConnection)'
+
+##########################################################
+# PROD
+##########################################################
+
+- stage: Prod
+
+  dependsOn: QA
+
+  displayName: Production Deployment
+
+  jobs:
+
+  - deployment: ProdDeploy
+
+    environment: Production
+
+    strategy:
+
+      runOnce:
+
+        deploy:
+
+          steps:
+
+          - checkout: self
+
+          - task: TerraformTask@5
+            inputs:
+              provider: azurerm
+              command: init
+              workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Prod'
+              backendServiceArm: '$(serviceConnection)'
+              backendAzureRmStorageAccountName: '$(backendStorageAccount)'
+              backendAzureRmContainerName: '$(backendContainer)'
+              backendAzureRmKey: 'prod.tfstate'
+
+          - task: TerraformTask@5
+            inputs:
+              provider: azurerm
+              command: plan
+              workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Prod'
+              environmentServiceNameAzureRM: '$(serviceConnection)'
+
+          - task: TerraformTask@5
+            inputs:
+              provider: azurerm
+              command: apply
+              workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Prod'
+              commandOptions: '-auto-approve'
+              environmentServiceNameAzureRM: '$(serviceConnection)'
