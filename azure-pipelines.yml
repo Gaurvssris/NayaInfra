@@ -83,7 +83,7 @@ stages:
 
     - powershell: |
         tflint --init
-        tflint
+        tflint --minimum-failure-severity=error
       displayName: TFLint
       workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
 
@@ -178,7 +178,7 @@ stages:
 
     - powershell: |
         tflint --init
-        tflint
+        tflint --minimum-failure-severity=error
       displayName: TFLint
       workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Qa'
 
@@ -273,7 +273,7 @@ stages:
 
     - powershell: |
         tflint --init
-        tflint
+        tflint --minimum-failure-severity=error
       displayName: TFLint
       workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Prod'
 
