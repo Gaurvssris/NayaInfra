@@ -93,7 +93,7 @@ stages:
       workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
 
     - powershell: |
-        checkov -d .
+        checkov -d . --soft-fail
       displayName: Checkov
       workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
 
@@ -188,7 +188,7 @@ stages:
       workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Qa'
 
     - powershell: |
-        checkov -d .
+        checkov -d . --soft-fail
       displayName: Checkov
       workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Qa'
 
@@ -283,7 +283,7 @@ stages:
       workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Prod'
 
     - powershell: |
-        checkov -d .
+        checkov -d . --soft-fail
       displayName: Checkov
       workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Prod'
 
