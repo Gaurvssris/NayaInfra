@@ -9,16 +9,17 @@ variables:
   backendStorageAccount: 'gssstrg'
   backendContainer: 'gsscontainer'
 
-##############################
+##############################################
 # DEV
-##############################
+##############################################
 
 stages:
 
 - stage: Dev
-  displayName: "Dev Stage"
+  displayName: DEV
 
   jobs:
+
   - job: TerraformDev
 
     steps:
@@ -29,11 +30,21 @@ stages:
       inputs:
         terraformVersion: 'latest'
 
+    - powershell: |
+        terraform version
+        where tflint
+        tflint --version
+        where tfsec
+        tfsec --version
+        where checkov
+        checkov --version
+      displayName: Verify Installed Tools
+
     - task: TerraformTask@5
       displayName: Terraform Init
       inputs:
-        provider: 'azurerm'
-        command: 'init'
+        provider: azurerm
+        command: init
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
         backendServiceArm: '$(serviceConnection)'
         backendAzureRmStorageAccountName: '$(backendStorageAccount)'
@@ -43,43 +54,44 @@ stages:
     - task: TerraformTask@5
       displayName: Terraform Validate
       inputs:
-        provider: 'azurerm'
-        command: 'validate'
+        provider: azurerm
+        command: validate
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
 
-    - script: |
+    - powershell: |
         tflint --init
         tflint
       displayName: TFLint
-      workingDirectory: $(System.DefaultWorkingDirectory)
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
 
-    - script: |
+    - powershell: |
         tfsec .
       displayName: TFSEC
-      workingDirectory: $(System.DefaultWorkingDirectory)
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
 
-    - script: |
+    - powershell: |
         checkov -d .
       displayName: Checkov
-      workingDirectory: $(System.DefaultWorkingDirectory)
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
 
     - task: TerraformTask@5
       displayName: Terraform Plan
       inputs:
-        provider: 'azurerm'
-        command: 'plan'
+        provider: azurerm
+        command: plan
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
         environmentServiceNameAzureRM: '$(serviceConnection)'
 
-##############################
+##############################################
 # QA
-##############################
+##############################################
 
 - stage: QA
-  displayName: "QA Stage"
   dependsOn: Dev
+  displayName: QA
 
   jobs:
+
   - job: TerraformQA
 
     steps:
@@ -89,8 +101,8 @@ stages:
     - task: TerraformTask@5
       displayName: Terraform Init
       inputs:
-        provider: 'azurerm'
-        command: 'init'
+        provider: azurerm
+        command: init
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Qa'
         backendServiceArm: '$(serviceConnection)'
         backendAzureRmStorageAccountName: '$(backendStorageAccount)'
@@ -100,42 +112,43 @@ stages:
     - task: TerraformTask@5
       displayName: Terraform Validate
       inputs:
-        provider: 'azurerm'
-        command: 'validate'
+        provider: azurerm
+        command: validate
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Qa'
 
-    - script: |
+    - powershell: |
         tflint
       displayName: TFLint
-      workingDirectory: $(System.DefaultWorkingDirectory)
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
 
-    - script: |
+    - powershell: |
         tfsec .
       displayName: TFSEC
-      workingDirectory: $(System.DefaultWorkingDirectory)
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
 
-    - script: |
+    - powershell: |
         checkov -d .
       displayName: Checkov
-      workingDirectory: $(System.DefaultWorkingDirectory)
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
 
     - task: TerraformTask@5
       displayName: Terraform Plan
       inputs:
-        provider: 'azurerm'
-        command: 'plan'
+        provider: azurerm
+        command: plan
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Qa'
         environmentServiceNameAzureRM: '$(serviceConnection)'
 
-##############################
+##############################################
 # PROD
-##############################
+##############################################
 
 - stage: Prod
-  displayName: "Production Stage"
   dependsOn: QA
+  displayName: PROD
 
   jobs:
+
   - job: TerraformProd
 
     steps:
@@ -145,8 +158,8 @@ stages:
     - task: TerraformTask@5
       displayName: Terraform Init
       inputs:
-        provider: 'azurerm'
-        command: 'init'
+        provider: azurerm
+        command: init
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Prod'
         backendServiceArm: '$(serviceConnection)'
         backendAzureRmStorageAccountName: '$(backendStorageAccount)'
@@ -156,29 +169,29 @@ stages:
     - task: TerraformTask@5
       displayName: Terraform Validate
       inputs:
-        provider: 'azurerm'
-        command: 'validate'
+        provider: azurerm
+        command: validate
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Prod'
 
-    - script: |
+    - powershell: |
         tflint
       displayName: TFLint
-      workingDirectory: $(System.DefaultWorkingDirectory)
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
 
-    - script: |
+    - powershell: |
         tfsec .
       displayName: TFSEC
-      workingDirectory: $(System.DefaultWorkingDirectory)
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
 
-    - script: |
+    - powershell: |
         checkov -d .
       displayName: Checkov
-      workingDirectory: $(System.DefaultWorkingDirectory)
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
 
     - task: TerraformTask@5
       displayName: Terraform Plan
       inputs:
-        provider: 'azurerm'
-        command: 'plan'
+        provider: azurerm
+        command: plan
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Prod'
         environmentServiceNameAzureRM: '$(serviceConnection)'
