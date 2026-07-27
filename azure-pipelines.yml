@@ -1,6 +1,12 @@
 trigger:
 - main
 
+parameters:
+- name: runDestroy
+  displayName: 'Run Terraform Destroy instead of Apply/Plan'
+  type: boolean
+  default: false
+
 pool:
   name: NayaInfra
 
@@ -99,18 +105,31 @@ stages:
 
     - task: TerraformTask@5
       displayName: Terraform Plan
+      condition: eq('${{ parameters.runDestroy }}', 'false')
       inputs:
         provider: azurerm
         command: plan
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
         environmentServiceNameAzureRM: '$(serviceConnection)'
+
     - task: TerraformTask@5
       displayName: Terraform Apply
+      condition: eq('${{ parameters.runDestroy }}', 'false')
       inputs:
         provider: azurerm
         command: apply
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
         environmentServiceNameAzureRM: '$(serviceConnection)'
+
+    - task: TerraformTask@5
+      displayName: Terraform Destroy
+      condition: eq('${{ parameters.runDestroy }}', 'true')
+      inputs:
+        provider: azurerm
+        command: destroy
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
+        environmentServiceNameAzureRM: '$(serviceConnection)'
+
 ##############################################
 # QA
 ##############################################
@@ -200,9 +219,19 @@ stages:
 
     - task: TerraformTask@5
       displayName: Terraform Plan
+      condition: eq('${{ parameters.runDestroy }}', 'false')
       inputs:
         provider: azurerm
         command: plan
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Qa'
+        environmentServiceNameAzureRM: '$(serviceConnection)'
+
+    - task: TerraformTask@5
+      displayName: Terraform Destroy
+      condition: eq('${{ parameters.runDestroy }}', 'true')
+      inputs:
+        provider: azurerm
+        command: destroy
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Qa'
         environmentServiceNameAzureRM: '$(serviceConnection)'
 
@@ -295,8 +324,18 @@ stages:
 
     - task: TerraformTask@5
       displayName: Terraform Plan
+      condition: eq('${{ parameters.runDestroy }}', 'false')
       inputs:
         provider: azurerm
         command: plan
+        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Prod'
+        environmentServiceNameAzureRM: '$(serviceConnection)'
+
+    - task: TerraformTask@5
+      displayName: Terraform Destroy
+      condition: eq('${{ parameters.runDestroy }}', 'true')
+      inputs:
+        provider: azurerm
+        command: destroy
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Prod'
         environmentServiceNameAzureRM: '$(serviceConnection)'
