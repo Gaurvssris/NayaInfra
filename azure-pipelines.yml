@@ -27,6 +27,7 @@ stages:
     - checkout: self
 
     - task: TerraformInstaller@1
+      displayName: Install Terraform
       inputs:
         terraformVersion: 'latest'
 
@@ -62,17 +63,17 @@ stages:
         tflint --init
         tflint
       displayName: TFLint
-      workingDirectory: '$(System.DefaultWorkingDirectory)'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
 
     - powershell: |
         tfsec .
       displayName: TFSEC
-      workingDirectory: '$(System.DefaultWorkingDirectory)'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
 
     - powershell: |
         checkov -d .
       displayName: Checkov
-      workingDirectory: '$(System.DefaultWorkingDirectory)'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
 
     - task: TerraformTask@5
       displayName: Terraform Plan
@@ -98,6 +99,21 @@ stages:
 
     - checkout: self
 
+    - task: TerraformInstaller@1
+      displayName: Install Terraform
+      inputs:
+        terraformVersion: 'latest'
+
+    - powershell: |
+        terraform version
+        where tflint
+        tflint --version
+        where tfsec
+        tfsec --version
+        where checkov
+        checkov --version
+      displayName: Verify Installed Tools
+
     - task: TerraformTask@5
       displayName: Terraform Init
       inputs:
@@ -117,19 +133,20 @@ stages:
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Qa'
 
     - powershell: |
+        tflint --init
         tflint
       displayName: TFLint
-      workingDirectory: '$(System.DefaultWorkingDirectory)'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Qa'
 
     - powershell: |
         tfsec .
       displayName: TFSEC
-      workingDirectory: '$(System.DefaultWorkingDirectory)'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Qa'
 
     - powershell: |
         checkov -d .
       displayName: Checkov
-      workingDirectory: '$(System.DefaultWorkingDirectory)'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Qa'
 
     - task: TerraformTask@5
       displayName: Terraform Plan
@@ -155,6 +172,21 @@ stages:
 
     - checkout: self
 
+    - task: TerraformInstaller@1
+      displayName: Install Terraform
+      inputs:
+        terraformVersion: 'latest'
+
+    - powershell: |
+        terraform version
+        where tflint
+        tflint --version
+        where tfsec
+        tfsec --version
+        where checkov
+        checkov --version
+      displayName: Verify Installed Tools
+
     - task: TerraformTask@5
       displayName: Terraform Init
       inputs:
@@ -174,19 +206,20 @@ stages:
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Prod'
 
     - powershell: |
+        tflint --init
         tflint
       displayName: TFLint
-      workingDirectory: '$(System.DefaultWorkingDirectory)'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Prod'
 
     - powershell: |
         tfsec .
       displayName: TFSEC
-      workingDirectory: '$(System.DefaultWorkingDirectory)'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Prod'
 
     - powershell: |
         checkov -d .
       displayName: Checkov
-      workingDirectory: '$(System.DefaultWorkingDirectory)'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Prod'
 
     - task: TerraformTask@5
       displayName: Terraform Plan
