@@ -9,9 +9,6 @@ variables:
   backendStorageAccount: 'gssstrg'
   backendContainer: 'gsscontainer'
 
-##############################################
-# DEV - DESTROY ONLY
-##############################################
 
 stages:
 
@@ -43,9 +40,8 @@ stages:
         backendAzureRmKey: 'dev.tfstate'
 
     - task: TerraformTask@5
-      displayName: Terraform Destroy
       inputs:
-        provider: azurerm
-        command: destroy
+        provider: 'azurerm'
+        command: 'apply'
         workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
-        environmentServiceNameAzureRM: '$(serviceConnection)'
+        environmentServiceNameAzureRM: 'NayaInfra'
