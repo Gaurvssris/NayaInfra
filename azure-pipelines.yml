@@ -24,12 +24,7 @@ steps:
       $(tag)
 
 - powershell: |
-    docker rm -f independence-day-app 2>$null
-  displayName: Remove Existing Container
-  continueOnError: true
-
-- powershell: |
-    docker run -d --name independence-day-app -p 8080:80 $(imageName):$(tag)
+    docker run -d --name independence-day-app -p 8085:80 $(imageName):$(tag)
   displayName: Run Docker Container
 
 - powershell: |
