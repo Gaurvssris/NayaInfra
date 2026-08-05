@@ -11,8 +11,20 @@ variables:
   tag: latest
 
 steps:
+
 - checkout: self
 
+# Install Trivy
+- powershell: |
+    choco install trivy -y
+  displayName: Install Trivy
+
+# Scan Source Code
+- powershell: |
+    trivy fs --severity HIGH,CRITICAL .
+  displayName: Trivy Filesystem Scan
+
+# Build Docker Image
 - task: Docker@2
   displayName: Build Docker Image
   inputs:
@@ -23,10 +35,16 @@ steps:
     tags: |
       $(tag)
 
+# Scan Docker Image
 - powershell: |
-    docker run -d --name independence-day-app -p 8085:80 $(imageName):$(tag)
-  displayName: Run Docker Container
+    trivy image --severity HIGH,CRITICAL $(imageName):$(tag)
+  displayName: Trivy Image Scan
+# Run Container
+- powershell: |
+    docker run -d --name independence-day-app -p 8090:80 $(imageName):$(tag)
+  displayName: Run Container
 
+# Verify
 - powershell: |
     docker ps
   displayName: Verify Container
