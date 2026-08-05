@@ -6,6 +6,10 @@ trigger:
 pool:
   name: NayaInfra
 
+variables:
+  imageName: independence-day-app
+  tag: latest
+
 steps:
 - checkout: self
 
@@ -13,8 +17,21 @@ steps:
   displayName: Build Docker Image
   inputs:
     command: build
+    repository: $(imageName)
     Dockerfile: '$(Build.SourcesDirectory)/independence-day-app/Dockerfile'
     buildContext: '$(Build.SourcesDirectory)/independence-day-app'
-    repository: independence-day-app
     tags: |
-      latest
+      $(tag)
+
+- powershell: |
+    docker rm -f independence-day-app 2>$null
+  displayName: Remove Existing Container
+  continueOnError: true
+
+- powershell: |
+    docker run -d --name independence-day-app -p 8080:80 $(imageName):$(tag)
+  displayName: Run Docker Container
+
+- powershell: |
+    docker ps
+  displayName: Verify Container
