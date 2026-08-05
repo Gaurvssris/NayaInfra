@@ -1,1 +1,0 @@
-console.log("July 26 Calendar Loaded");
