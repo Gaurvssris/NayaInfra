@@ -8,21 +8,19 @@ pool:
 
 variables:
   workingDir: '$(System.DefaultWorkingDirectory)/environment/Dev'
+  tflintVersion: '0.53.0'
+  tfsecVersion: '1.28.10'
 
 stages:
-
 #==============================================================
 # Stage-1 Validation & Security Scan
 #==============================================================
 - stage: Validation
   displayName: "Terraform Validation & Security"
-
   jobs:
   - job: Validate
     displayName: "Terraform Checks"
-
     steps:
-
     # Terraform Install
     - task: TerraformInstaller@1
       displayName: Install Terraform
@@ -41,16 +39,6 @@ stages:
         backendAzureRmContainerName: 'gsscontainer'
         backendAzureRmKey: 'backup.tfstate'
 
-    # Terraform Format
-    # - task: TerraformTask@5
-    #   displayName: Terraform Format
-    #   inputs:
-    #     provider: 'azurerm'
-    #     command: 'custom'
-    #     customCommand: 'fmt'
-    #     commandOptions: '-recursive'
-    #     workingDirectory: '$(workingDir)'
-
     # Terraform Validate
     - task: TerraformTask@5
       displayName: Terraform Validate
@@ -59,28 +47,59 @@ stages:
         command: 'validate'
         workingDirectory: '$(workingDir)'
 
-    # Install TFLint
-    - script: |
-        choco install tflint -y
+    # Install TFLint (choco removed - direct binary download)
+    - task: PowerShell@2
       displayName: Install TFLint
+      inputs:
+        targetType: 'inline'
+        script: |
+          $ErrorActionPreference = "Stop"
+          $version = "$(tflintVersion)"
+          $url = "https://github.com/terraform-linters/tflint/releases/download/v$version/tflint_windows_amd64.zip"
+          $zipPath = "$(Agent.TempDirectory)\tflint.zip"
+          $installDir = "$(Agent.ToolsDirectory)\tflint\$version"
+
+          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+          Invoke-WebRequest -Uri $url -OutFile $zipPath
+          Expand-Archive -Path $zipPath -DestinationPath $installDir -Force
+
+          Write-Host "##vso[task.prependpath]$installDir"
 
     # Run TFLint
-    - script: |
-        cd $(workingDir)
-        tflint --init
-        tflint
+    - task: PowerShell@2
       displayName: Run TFLint
+      inputs:
+        targetType: 'inline'
+        script: |
+          cd "$(workingDir)"
+          tflint --version
+          tflint --init
+          tflint
 
-    # Install TFSec
-    - script: |
-        choco install tfsec -y
+    # Install TFSec (choco removed - direct binary download)
+    - task: PowerShell@2
       displayName: Install TFSec
+      inputs:
+        targetType: 'inline'
+        script: |
+          $ErrorActionPreference = "Stop"
+          $version = "$(tfsecVersion)"
+          $url = "https://github.com/aquasecurity/tfsec/releases/download/v$version/tfsec-windows-amd64.exe"
+          $installDir = "$(Agent.ToolsDirectory)\tfsec\$version"
+
+          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+          Invoke-WebRequest -Uri $url -OutFile "$installDir\tfsec.exe"
+
+          Write-Host "##vso[task.prependpath]$installDir"
 
     # Run TFSec
-    - script: |
-        cd $(workingDir)
-        tfsec .
+    - task: PowerShell@2
       displayName: Run TFSec
+      inputs:
+        targetType: 'inline'
+        script: |
+          cd "$(workingDir)"
+          tfsec.exe .
 
     # Install Python
     - task: UsePythonVersion@0
@@ -101,24 +120,17 @@ stages:
 #==============================================================
 # Stage-2 Manual Approval
 #==============================================================
-
 - stage: Approval
   displayName: "Manual Approval"
-
   dependsOn: Validation
-
   jobs:
-
   - deployment: Approval
     displayName: "Wait For Approval"
-
     environment: Production
-
     strategy:
       runOnce:
         deploy:
           steps:
-
           - script: |
               echo "Approval Completed"
             displayName: Approval Completed
@@ -126,23 +138,16 @@ stages:
 #==============================================================
 # Stage-3 Terraform Plan
 #==============================================================
-
 - stage: Plan
   displayName: "Terraform Plan"
-
   dependsOn: Approval
-
   jobs:
-
   - job: TerraformPlan
     displayName: Terraform Plan
-
     steps:
-
     - task: TerraformInstaller@1
       inputs:
         terraformVersion: '1.10.5'
-
     - task: TerraformTask@5
       displayName: Terraform Init
       inputs:
@@ -153,7 +158,6 @@ stages:
         backendAzureRmStorageAccountName: 'gssstrg'
         backendAzureRmContainerName: 'gsscontainer'
         backendAzureRmKey: 'backup.tfstate'
-
     - task: TerraformTask@5
       displayName: Terraform Plan
       inputs:
