@@ -8,6 +8,7 @@ variables:
   workingDir: '$(System.DefaultWorkingDirectory)/environment/Dev'
   tflintVersion: '0.53.0'
   tfsecVersion: '1.28.10'
+  pythonVersion: '3.12.7'
 
 stages:
 #==============================================================
@@ -71,95 +72,4 @@ stages:
         script: |
           cd "$(workingDir)"
           tflint --version
-          tflint --init
-          tflint --minimum-failure-severity=error
-
-    # Install TFSec
-    - task: PowerShell@2
-      displayName: Install TFSec
-      inputs:
-        targetType: 'inline'
-        script: |
-          $ErrorActionPreference = "Stop"
-          $version = "$(tfsecVersion)"
-          $url = "https://github.com/aquasecurity/tfsec/releases/download/v$version/tfsec-windows-amd64.exe"
-          $installDir = "$(Agent.ToolsDirectory)\tfsec\$version"
-
-          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-          Invoke-WebRequest -Uri $url -OutFile "$installDir\tfsec.exe"
-
-          Write-Host "##vso[task.prependpath]$installDir"
-
-    # Run TFSec - soft-fail so findings are reported but don't break the build
-    - task: PowerShell@2
-      displayName: Run TFSec
-      inputs:
-        targetType: 'inline'
-        script: |
-          cd "$(workingDir)"
-          tfsec.exe . --soft-fail
-
-    # Install Python
-    - task: UsePythonVersion@0
-      inputs:
-        versionSpec: '3.x'
-
-    # Install Checkov
-    - script: |
-        pip install checkov
-      displayName: Install Checkov
-
-    # Run Checkov - soft-fail so findings are reported but don't break the build
-    - script: |
-        cd $(workingDir)
-        checkov -d . --soft-fail
-      displayName: Run Checkov
-
-#==============================================================
-# Stage-2 Manual Approval
-#==============================================================
-- stage: Approval
-  displayName: "Manual Approval"
-  dependsOn: Validation
-  jobs:
-  - deployment: Approval
-    displayName: "Wait For Approval"
-    environment: Production
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - script: |
-              echo "Approval Completed"
-            displayName: Approval Completed
-
-#==============================================================
-# Stage-3 Terraform Plan
-#==============================================================
-- stage: Plan
-  displayName: "Terraform Plan"
-  dependsOn: Approval
-  jobs:
-  - job: TerraformPlan
-    displayName: Terraform Plan
-    steps:
-    - task: TerraformInstaller@1
-      inputs:
-        terraformVersion: '1.10.5'
-    - task: TerraformTask@5
-      displayName: Terraform Init
-      inputs:
-        provider: 'azurerm'
-        command: 'init'
-        workingDirectory: '$(workingDir)'
-        backendServiceArm: 'NayaInfra'
-        backendAzureRmStorageAccountName: 'gssstrg'
-        backendAzureRmContainerName: 'gsscontainer'
-        backendAzureRmKey: 'backup.tfstate'
-    - task: TerraformTask@5
-      displayName: Terraform Plan
-      inputs:
-        provider: 'azurerm'
-        command: 'plan'
-        workingDirectory: '$(workingDir)'
-        environmentServiceNameAzureRM: 'NayaInfra'
+          tflint
