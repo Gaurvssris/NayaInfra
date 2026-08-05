@@ -1,88 +1,95 @@
 
 
+# azure-pipelines.yml
 trigger:
-- main
+  - main
 
 pool:
-  name: NayaInfra
+  name: NayaInfra   # NayaInfra self-hosted Windows agent
 
 variables:
-  imageName: independence-day-app
-  containerName: independence-day-app
-  tag: latest
+  trivyDir: '$(Build.SourcesDirectory)\trivy'
 
 steps:
 
-# Checkout Source
-- checkout: self
+  # ---------------------------------------------------------
+  # 1. Checkout source code
+  # ---------------------------------------------------------
+  - checkout: self
+    displayName: 'Checkout Gaurvssris/NayaInfra@main'
+    clean: true
+    fetchDepth: 1
 
-# Download Trivy
-- task: PowerShell@2
-  displayName: Download Trivy
-  inputs:
-    targetType: inline
-    script: |
-      $ProgressPreference = 'SilentlyContinue'
+  # ---------------------------------------------------------
+  # 2. Download Trivy (FIXED - dynamic latest release fetch)
+  # ---------------------------------------------------------
+  - task: PowerShell@2
+    displayName: 'Download Trivy'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $ErrorActionPreference = 'Stop'
 
-      Invoke-WebRequest `
-      -Uri "https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.65.0_windows-64bit.zip" `
-      -OutFile "$(Agent.TempDirectory)\trivy.zip"
+        Write-Host "Fetching latest Trivy release info..."
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/aquasecurity/trivy/releases/latest" -Headers @{ "User-Agent" = "AzurePipelines" }
+        $version = $release.tag_name.TrimStart('v')
+        Write-Host "Latest Trivy version: $version"
 
-      Expand-Archive "$(Agent.TempDirectory)\trivy.zip" `
-      -DestinationPath "$(Agent.TempDirectory)\trivy" -Force
+        # Naye releases mein asset naam capital 'Windows' ke saath hota hai
+        $assetName = "trivy_${version}_Windows-64bit.zip"
+        $asset = $release.assets | Where-Object { $_.name -eq $assetName }
 
-      echo "##vso[task.prependpath]$(Agent.TempDirectory)\trivy"
+        if (-not $asset) {
+            # fallback purane naming convention ke liye
+            $assetName = "trivy_${version}_windows-64bit.zip"
+            $asset = $release.assets | Where-Object { $_.name -eq $assetName }
+        }
 
-      trivy.exe --version
+        if (-not $asset) {
+            Write-Error "Trivy Windows asset ($assetName) nahi mila release $version mein."
+            exit 1
+        }
 
-# Scan Source Code
-- task: PowerShell@2
-  displayName: Trivy Filesystem Scan
-  inputs:
-    targetType: inline
-    script: |
-      trivy.exe fs `
-      --severity HIGH,CRITICAL `
-      --no-progress `
-      "$(Build.SourcesDirectory)"
+        $zipPath = "$(Build.SourcesDirectory)\trivy.zip"
+        Write-Host "Downloading: $($asset.browser_download_url)"
+        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zipPath -UseBasicParsing
 
-# Build Docker Image
-- task: Docker@2
-  displayName: Build Docker Image
-  inputs:
-    command: build
-    repository: $(imageName)
-    Dockerfile: '$(Build.SourcesDirectory)\independence-day-app\Dockerfile'
-    buildContext: '$(Build.SourcesDirectory)\independence-day-app'
-    tags: |
-      $(tag)
+        Write-Host "Extracting Trivy..."
+        Expand-Archive -Path $zipPath -DestinationPath "$(trivyDir)" -Force
 
-# Scan Docker Image
-- task: PowerShell@2
-  displayName: Trivy Image Scan
-  inputs:
-    targetType: inline
-    script: |
-      trivy.exe image `
-      --severity HIGH,CRITICAL `
-      --no-progress `
-      $(imageName):$(tag)
-# Run New Container
-- task: PowerShell@2
-  displayName: Run Docker Container
-  inputs:
-    targetType: inline
-    script: |
-      docker run -d `
-      --name $(containerName) `
-      -p 8089:80 `
-      $(imageName):$(tag)
+        Write-Host "Trivy successfully downloaded to $(trivyDir)"
+      errorActionPreference: 'stop'
+      failOnStderr: true
 
-# Verify
-- task: PowerShell@2
-  displayName: Verify Docker Container
-  inputs:
-    targetType: inline
-    script: |
-      docker ps
-      docker images
+  # ---------------------------------------------------------
+  # 3. Verify Trivy installed correctly
+  # ---------------------------------------------------------
+  - task: PowerShell@2
+    displayName: 'Verify Trivy Installation'
+    condition: succeeded()
+    inputs:
+      targetType: 'inline'
+      script: |
+        & "$(trivyDir)\trivy.exe" --version
+
+  # ---------------------------------------------------------
+  # 4. Run Trivy filesystem/IaC scan on repo
+  # ---------------------------------------------------------
+  - task: PowerShell@2
+    displayName: 'Run Trivy Scan'
+    condition: succeeded()
+    inputs:
+      targetType: 'inline'
+      script: |
+        & "$(trivyDir)\trivy.exe" fs --format table --output "$(Build.ArtifactStagingDirectory)\trivy-report.txt" "$(Build.SourcesDirectory)"
+
+  # ---------------------------------------------------------
+  # 5. Publish scan report as pipeline artifact
+  # ---------------------------------------------------------
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Trivy Report'
+    condition: succeededOrFailed()
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\trivy-report.txt'
+      ArtifactName: 'trivy-scan-report'
+      publishLocation: 'Container'
