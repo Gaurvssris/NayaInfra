@@ -6,26 +6,15 @@ trigger:
 pool:
   name: NayaInfra
 
-variables:
-  imageName: independence-app
-
 steps:
+- checkout: self
 
 - task: Docker@2
-  displayName: Build Image
+  displayName: Build Docker Image
   inputs:
     command: build
-    Dockerfile: Dockerfile
-    repository: $(imageName)
+    Dockerfile: '$(Build.SourcesDirectory)/independence-day-app/Dockerfile'
+    buildContext: '$(Build.SourcesDirectory)/independence-day-app'
+    repository: independence-day-app
     tags: |
       latest
-
-- script: |
-    docker images
-  displayName: Show Images
-
-- task: Docker@2
-  displayName: Run Container
-  inputs:
-    command: run
-    arguments: -d -p 8080:80 --name india $(imageName):latest
