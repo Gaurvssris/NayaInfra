@@ -5,43 +5,161 @@ pool:
   name: NayaInfra
 
 variables:
-  serviceConnection: 'NayaInfra'
-  backendStorageAccount: 'gssstrg'
-  backendContainer: 'gsscontainer'
-
+  workingDir: '$(System.DefaultWorkingDirectory)/environment/Dev'
+  tflintVersion: '0.53.0'
+  tfsecVersion: '1.28.10'
 
 stages:
-
-- stage: Dev
-  displayName: DEV
-
+#==============================================================
+# Stage-1 Validation & Security Scan
+#==============================================================
+- stage: Validation
+  displayName: "Terraform Validation & Security"
   jobs:
-
-  - job: TerraformDev
-
+  - job: Validate
+    displayName: "Terraform Checks"
     steps:
-
-    - checkout: self
-
+    # Terraform Install
     - task: TerraformInstaller@1
       displayName: Install Terraform
       inputs:
-        terraformVersion: 'latest'
+        terraformVersion: '1.10.5'
 
+    # Terraform Init
     - task: TerraformTask@5
       displayName: Terraform Init
       inputs:
-        provider: azurerm
-        command: init
-        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
-        backendServiceArm: '$(serviceConnection)'
-        backendAzureRmStorageAccountName: '$(backendStorageAccount)'
-        backendAzureRmContainerName: '$(backendContainer)'
-        backendAzureRmKey: 'dev.tfstate'
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(workingDir)'
+        backendServiceArm: 'NayaInfra'
+        backendAzureRmStorageAccountName: 'gssstrg'
+        backendAzureRmContainerName: 'gsscontainer'
+        backendAzureRmKey: 'backup.tfstate'
 
+    # Terraform Validate
     - task: TerraformTask@5
+      displayName: Terraform Validate
       inputs:
         provider: 'azurerm'
-        command: 'apply'
-        workingDirectory: '$(System.DefaultWorkingDirectory)/environment/Dev'
+        command: 'validate'
+        workingDirectory: '$(workingDir)'
+
+    # Install TFLint
+    - task: PowerShell@2
+      displayName: Install TFLint
+      inputs:
+        targetType: 'inline'
+        script: |
+          $ErrorActionPreference = "Stop"
+          $version = "$(tflintVersion)"
+          $url = "https://github.com/terraform-linters/tflint/releases/download/v$version/tflint_windows_amd64.zip"
+          $zipPath = "$(Agent.TempDirectory)\tflint.zip"
+          $installDir = "$(Agent.ToolsDirectory)\tflint\$version"
+
+          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+          Invoke-WebRequest -Uri $url -OutFile $zipPath
+          Expand-Archive -Path $zipPath -DestinationPath $installDir -Force
+
+          Write-Host "##vso[task.prependpath]$installDir"
+
+    # Run TFLint - only fail pipeline on actual errors, not warnings
+    - task: PowerShell@2
+      displayName: Run TFLint
+      inputs:
+        targetType: 'inline'
+        script: |
+          cd "$(workingDir)"
+          tflint --version
+          tflint --init
+          tflint --minimum-failure-severity=error
+
+    # Install TFSec
+    - task: PowerShell@2
+      displayName: Install TFSec
+      inputs:
+        targetType: 'inline'
+        script: |
+          $ErrorActionPreference = "Stop"
+          $version = "$(tfsecVersion)"
+          $url = "https://github.com/aquasecurity/tfsec/releases/download/v$version/tfsec-windows-amd64.exe"
+          $installDir = "$(Agent.ToolsDirectory)\tfsec\$version"
+
+          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+          Invoke-WebRequest -Uri $url -OutFile "$installDir\tfsec.exe"
+
+          Write-Host "##vso[task.prependpath]$installDir"
+
+    # Run TFSec - soft-fail so findings are reported but don't break the build
+    - task: PowerShell@2
+      displayName: Run TFSec
+      inputs:
+        targetType: 'inline'
+        script: |
+          cd "$(workingDir)"
+          tfsec.exe . --soft-fail
+
+    # Install Python
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.x'
+
+    # Install Checkov
+    - script: |
+        pip install checkov
+      displayName: Install Checkov
+
+    # Run Checkov - soft-fail so findings are reported but don't break the build
+    - script: |
+        cd $(workingDir)
+        checkov -d . --soft-fail
+      displayName: Run Checkov
+
+#==============================================================
+# Stage-2 Manual Approval
+#==============================================================
+- stage: Approval
+  displayName: "Manual Approval"
+  dependsOn: Validation
+  jobs:
+  - deployment: Approval
+    displayName: "Wait For Approval"
+    environment: Production
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: |
+              echo "Approval Completed"
+            displayName: Approval Completed
+
+#==============================================================
+# Stage-3 Terraform Plan
+#==============================================================
+- stage: Plan
+  displayName: "Terraform Plan"
+  dependsOn: Approval
+  jobs:
+  - job: TerraformPlan
+    displayName: Terraform Plan
+    steps:
+    - task: TerraformInstaller@1
+      inputs:
+        terraformVersion: '1.10.5'
+    - task: TerraformTask@5
+      displayName: Terraform Init
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(workingDir)'
+        backendServiceArm: 'NayaInfra'
+        backendAzureRmStorageAccountName: 'gssstrg'
+        backendAzureRmContainerName: 'gsscontainer'
+        backendAzureRmKey: 'backup.tfstate'
+    - task: TerraformTask@5
+      displayName: Terraform Plan
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(workingDir)'
         environmentServiceNameAzureRM: 'NayaInfra'
