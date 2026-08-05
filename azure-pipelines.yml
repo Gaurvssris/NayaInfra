@@ -8,21 +8,43 @@ pool:
 
 variables:
   imageName: independence-day-app
+  containerName: independence-day-app
   tag: latest
 
 steps:
 
+# Checkout Source
 - checkout: self
 
-# Install Trivy
-- powershell: |
-    choco install trivy -y
-  displayName: Install Trivy
+# Download Trivy
+- task: PowerShell@2
+  displayName: Download Trivy
+  inputs:
+    targetType: inline
+    script: |
+      $ProgressPreference = 'SilentlyContinue'
+
+      Invoke-WebRequest `
+      -Uri "https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.65.0_windows-64bit.zip" `
+      -OutFile "$(Agent.TempDirectory)\trivy.zip"
+
+      Expand-Archive "$(Agent.TempDirectory)\trivy.zip" `
+      -DestinationPath "$(Agent.TempDirectory)\trivy" -Force
+
+      echo "##vso[task.prependpath]$(Agent.TempDirectory)\trivy"
+
+      trivy.exe --version
 
 # Scan Source Code
-- powershell: |
-    trivy fs --severity HIGH,CRITICAL .
+- task: PowerShell@2
   displayName: Trivy Filesystem Scan
+  inputs:
+    targetType: inline
+    script: |
+      trivy.exe fs `
+      --severity HIGH,CRITICAL `
+      --no-progress `
+      "$(Build.SourcesDirectory)"
 
 # Build Docker Image
 - task: Docker@2
@@ -30,21 +52,37 @@ steps:
   inputs:
     command: build
     repository: $(imageName)
-    Dockerfile: '$(Build.SourcesDirectory)/independence-day-app/Dockerfile'
-    buildContext: '$(Build.SourcesDirectory)/independence-day-app'
+    Dockerfile: '$(Build.SourcesDirectory)\independence-day-app\Dockerfile'
+    buildContext: '$(Build.SourcesDirectory)\independence-day-app'
     tags: |
       $(tag)
 
 # Scan Docker Image
-- powershell: |
-    trivy image --severity HIGH,CRITICAL $(imageName):$(tag)
+- task: PowerShell@2
   displayName: Trivy Image Scan
-# Run Container
-- powershell: |
-    docker run -d --name independence-day-app -p 8090:80 $(imageName):$(tag)
-  displayName: Run Container
+  inputs:
+    targetType: inline
+    script: |
+      trivy.exe image `
+      --severity HIGH,CRITICAL `
+      --no-progress `
+      $(imageName):$(tag)
+# Run New Container
+- task: PowerShell@2
+  displayName: Run Docker Container
+  inputs:
+    targetType: inline
+    script: |
+      docker run -d `
+      --name $(containerName) `
+      -p 8089:80 `
+      $(imageName):$(tag)
 
 # Verify
-- powershell: |
-    docker ps
-  displayName: Verify Container
+- task: PowerShell@2
+  displayName: Verify Docker Container
+  inputs:
+    targetType: inline
+    script: |
+      docker ps
+      docker images
