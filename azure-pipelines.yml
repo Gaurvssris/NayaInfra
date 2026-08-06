@@ -4,92 +4,129 @@
 trigger:
   - main
 
-pool:
-  name: NayaInfra   # NayaInfra self-hosted Windows agent
+resources:
+  repositories: []
 
 variables:
-  trivyDir: '$(Build.SourcesDirectory)\trivy'
+  azureSubscription: 'NayaInfra'                  # Azure RM Service Connection
+  acrServiceConnection: 'a0705b5b-e8b4-4c9e-802a-eca3dae3f3e0'
+  acrName: 'gssdevacr'
+  containerRegistry: 'gssdevacr.azurecr.io'
+  imageRepository: 'gaurvssrisnayainfra'
+  dockerfilePath: '$(Build.SourcesDirectory)/independence-day-app/Dockerfile'
+  tag: '$(Build.BuildId)'
+  resourceGroup: 'RG-Dev'
+  containerGroup: 'independence-day-app'
+  dnsNameLabel: 'independence-day-demo-$(Build.BuildId)'
 
-steps:
+pool:
+  vmImage: ubuntu-latest
 
-  # ---------------------------------------------------------
-  # 1. Checkout source code
-  # ---------------------------------------------------------
-  - checkout: self
-    displayName: 'Checkout Gaurvssris/NayaInfra@main'
-    clean: true
-    fetchDepth: 1
+stages:
 
-  # ---------------------------------------------------------
-  # 2. Download Trivy (FIXED - dynamic latest release fetch)
-  # ---------------------------------------------------------
-  - task: PowerShell@2
-    displayName: 'Download Trivy'
-    inputs:
-      targetType: 'inline'
-      script: |
-        $ErrorActionPreference = 'Stop'
+  #=====================================================
+  # Stage-1 : Security Scan
+  #=====================================================
+  - stage: SecurityScan
+    displayName: "Security Scan"
+    jobs:
+      - job: Trivy
+        steps:
+          - checkout: self
 
-        Write-Host "Fetching latest Trivy release info..."
-        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/aquasecurity/trivy/releases/latest" -Headers @{ "User-Agent" = "AzurePipelines" }
-        $version = $release.tag_name.TrimStart('v')
-        Write-Host "Latest Trivy version: $version"
+          - script: |
+              sudo apt-get update
+              sudo apt-get install -y wget
 
-        # Naye releases mein asset naam capital 'Windows' ke saath hota hai
-        $assetName = "trivy_${version}_Windows-64bit.zip"
-        $asset = $release.assets | Where-Object { $_.name -eq $assetName }
+              TRIVY_VERSION=0.73.0
 
-        if (-not $asset) {
-            # fallback purane naming convention ke liye
-            $assetName = "trivy_${version}_windows-64bit.zip"
-            $asset = $release.assets | Where-Object { $_.name -eq $assetName }
-        }
+              wget https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.deb
 
-        if (-not $asset) {
-            Write-Error "Trivy Windows asset ($assetName) nahi mila release $version mein."
-            exit 1
-        }
+              sudo dpkg -i trivy_${TRIVY_VERSION}_Linux-64bit.deb
 
-        $zipPath = "$(Build.SourcesDirectory)\trivy.zip"
-        Write-Host "Downloading: $($asset.browser_download_url)"
-        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zipPath -UseBasicParsing
+              trivy --version
+            displayName: Install Trivy
 
-        Write-Host "Extracting Trivy..."
-        Expand-Archive -Path $zipPath -DestinationPath "$(trivyDir)" -Force
+          - script: |
+              trivy fs \
+                --exit-code 1 \
+                --severity CRITICAL,HIGH \
+                .
+            displayName: Scan Source Code
 
-        Write-Host "Trivy successfully downloaded to $(trivyDir)"
-      errorActionPreference: 'stop'
-      failOnStderr: true
+  #=====================================================
+  # Stage-2 : Docker Build & Push
+  #=====================================================
+  - stage: Build
+    dependsOn: SecurityScan
+    jobs:
+      - job: Docker
+        steps:
+          - checkout: self
 
-  # ---------------------------------------------------------
-  # 3. Verify Trivy installed correctly
-  # ---------------------------------------------------------
-  - task: PowerShell@2
-    displayName: 'Verify Trivy Installation'
-    condition: succeeded()
-    inputs:
-      targetType: 'inline'
-      script: |
-        & "$(trivyDir)\trivy.exe" --version
+          - task: Docker@2
+            displayName: Docker Build and Push
+            inputs:
+              command: buildAndPush
+              repository: $(imageRepository)
+              dockerfile: $(dockerfilePath)
+              containerRegistry: $(acrServiceConnection)
+              tags: |
+                $(tag)
+                latest
 
-  # ---------------------------------------------------------
-  # 4. Run Trivy filesystem/IaC scan on repo
-  # ---------------------------------------------------------
-  - task: PowerShell@2
-    displayName: 'Run Trivy Scan'
-    condition: succeeded()
-    inputs:
-      targetType: 'inline'
-      script: |
-        & "$(trivyDir)\trivy.exe" fs --format table --output "$(Build.ArtifactStagingDirectory)\trivy-report.txt" "$(Build.SourcesDirectory)"
+  #=====================================================
+  # Stage-3 : Production Approval
+  #=====================================================
+  - stage: Approval
+    dependsOn: Build
+    jobs:
+      - deployment: WaitForApproval
+        displayName: Manual Approval
+        environment: Prod
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - script: echo "Approved Successfully"
 
-  # ---------------------------------------------------------
-  # 5. Publish scan report as pipeline artifact
-  # ---------------------------------------------------------
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish Trivy Report'
-    condition: succeededOrFailed()
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)\trivy-report.txt'
-      ArtifactName: 'trivy-scan-report'
-      publishLocation: 'Container'
+  #=====================================================
+  # Stage-4 : Deploy Container
+  #=====================================================
+  - stage: Deploy
+    dependsOn: Approval
+    jobs:
+      - job: DeployACI
+        steps:
+          - task: AzureCLI@2
+            displayName: Deploy Azure Container Instance
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az container delete \
+                  --resource-group $(resourceGroup) \
+                  --name $(containerGroup) \
+                  --yes || true
+
+                az container create \
+                  --resource-group $(resourceGroup) \
+                  --name $(containerGroup) \
+                  --image $(containerRegistry)/$(imageRepository):$(tag) \
+                  --registry-login-server $(containerRegistry) \
+                  --registry-username $(acrName) \
+                  --registry-password $(az acr credential show --name $(acrName) --query passwords[0].value -o tsv) \
+                  --dns-name-label $(dnsNameLabel) \
+                  --ports 80 \
+                  --os-type Linux \
+                  --cpu 1 \
+                  --memory 1.5
+
+                echo "Application URL"
+
+                az container show \
+                  --resource-group $(resourceGroup) \
+                  --name $(containerGroup) \
+                  --query ipAddress.fqdn \
+                  -o tsv
