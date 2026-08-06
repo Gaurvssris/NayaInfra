@@ -3,10 +3,10 @@
 # https://docs.microsoft.com/azure/devops/pipelines/languages/docker
 
 trigger:
-- main
+  - main
 
 resources:
-- repo: self
+  repositories: []
 
 variables:
   azureSubscription: 'NayaInfra'                  # Azure RM Service Connection
@@ -25,138 +25,109 @@ pool:
 
 stages:
 
-#=====================================================
-# Stage-1 : Security Scan
-#=====================================================
+  #=====================================================
+  # Stage-1 : Security Scan
+  #=====================================================
+  - stage: SecurityScan
+    displayName: "Security Scan"
+    jobs:
+      - job: Trivy
+        steps:
+          - checkout: self
 
-- stage: SecurityScan
-  displayName: "Security Scan"
+          - script: |
+              sudo apt-get update
+              sudo apt-get install -y wget
 
-  jobs:
-  - job: Trivy
+              TRIVY_VERSION=0.73.0
 
-    steps:
+              wget https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.deb
 
-    - checkout: self
+              sudo dpkg -i trivy_${TRIVY_VERSION}_Linux-64bit.deb
 
-    - script: |
-        sudo apt-get update
-        sudo apt-get install -y wget
-        wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.67.2_Linux-64bit.deb
-        sudo dpkg -i trivy_0.67.2_Linux-64bit.deb
-      displayName: Install Trivy
+              trivy --version
+            displayName: Install Trivy
 
-    - script: |
-        trivy fs \
-        --exit-code 1 \
-        --severity CRITICAL,HIGH \
-        .
-      displayName: Scan Source Code
+          - script: |
+              trivy fs \
+                --exit-code 1 \
+                --severity CRITICAL,HIGH \
+                .
+            displayName: Scan Source Code
 
+  #=====================================================
+  # Stage-2 : Docker Build & Push
+  #=====================================================
+  - stage: Build
+    dependsOn: SecurityScan
+    jobs:
+      - job: Docker
+        steps:
+          - checkout: self
 
-#=====================================================
-# Stage-2 : Docker Build & Push
-#=====================================================
+          - task: Docker@2
+            displayName: Docker Build and Push
+            inputs:
+              command: buildAndPush
+              repository: $(imageRepository)
+              dockerfile: $(dockerfilePath)
+              containerRegistry: $(acrServiceConnection)
+              tags: |
+                $(tag)
+                latest
 
-- stage: Build
-  dependsOn: SecurityScan
+  #=====================================================
+  # Stage-3 : Production Approval
+  #=====================================================
+  - stage: Approval
+    dependsOn: Build
+    jobs:
+      - deployment: WaitForApproval
+        displayName: Manual Approval
+        environment: Prod
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - script: echo "Approved Successfully"
 
-  jobs:
+  #=====================================================
+  # Stage-4 : Deploy Container
+  #=====================================================
+  - stage: Deploy
+    dependsOn: Approval
+    jobs:
+      - job: DeployACI
+        steps:
+          - task: AzureCLI@2
+            displayName: Deploy Azure Container Instance
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az container delete \
+                  --resource-group $(resourceGroup) \
+                  --name $(containerGroup) \
+                  --yes || true
 
-  - job: Docker
+                az container create \
+                  --resource-group $(resourceGroup) \
+                  --name $(containerGroup) \
+                  --image $(containerRegistry)/$(imageRepository):$(tag) \
+                  --registry-login-server $(containerRegistry) \
+                  --registry-username $(acrName) \
+                  --registry-password $(az acr credential show --name $(acrName) --query passwords[0].value -o tsv) \
+                  --dns-name-label $(dnsNameLabel) \
+                  --ports 80 \
+                  --os-type Linux \
+                  --cpu 1 \
+                  --memory 1.5
 
-    steps:
+                echo "Application URL"
 
-    - checkout: self
-
-    - task: Docker@2
-      displayName: Docker Build and Push
-      inputs:
-        command: buildAndPush
-        repository: $(imageRepository)
-        dockerfile: $(dockerfilePath)
-        containerRegistry: $(acrServiceConnection)
-        tags: |
-          $(tag)
-          latest
-
-
-#=====================================================
-# Stage-3 : Production Approval
-#=====================================================
-
-- stage: Approval
-
-  dependsOn: Build
-
-  jobs:
-
-  - deployment: WaitForApproval
-
-    displayName: Manual Approval
-
-    environment: Prod
-
-    strategy:
-
-      runOnce:
-
-        deploy:
-
-          steps:
-
-          - script: echo "Approved Successfully"
-
-
-#=====================================================
-# Stage-4 : Deploy Container
-#=====================================================
-
-- stage: Deploy
-
-  dependsOn: Approval
-
-  jobs:
-
-  - job: DeployACI
-
-    steps:
-
-    - task: AzureCLI@2
-      displayName: Deploy Azure Container Instance
-
-      inputs:
-
-        azureSubscription: $(azureSubscription)
-
-        scriptType: bash
-
-        scriptLocation: inlineScript
-
-        inlineScript: |
-
-          az container delete \
-            --resource-group $(resourceGroup) \
-            --name $(containerGroup) \
-            --yes || true
-
-          az container create \
-            --resource-group $(resourceGroup) \
-            --name $(containerGroup) \
-            --image $(containerRegistry)/$(imageRepository):$(tag) \
-            --registry-login-server $(containerRegistry) \
-            --registry-username $(acrName) \
-            --registry-password $(az acr credential show --name $(acrName) --query passwords[0].value -o tsv) \
-            --dns-name-label $(dnsNameLabel) \
-            --ports 80 \
-            --os-type Linux \
-            --cpu 1 \
-            --memory 1.5
-
-          echo "Application URL"
-
-          az container show \
-            --resource-group $(resourceGroup) \
-            --name $(containerGroup) \
-            --query ipAddress.fqdn \
-            -o tsv
+                az container show \
+                  --resource-group $(resourceGroup) \
+                  --name $(containerGroup) \
+                  --query ipAddress.fqdn \
+                  -o tsv
