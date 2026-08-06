@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AAYA SAAWAN JHOOM KE</title>
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+}
+
+body{
+overflow:hidden;
+height:100vh;
+font-family:Arial,Helvetica,sans-serif;
+background:linear-gradient(-45deg,#1e3c72,#2a5298,#0f9b8e,#38ef7d,#5f2c82,#49a09d);
+background-size:600% 600%;
+animation:bgMove 18s ease infinite;
+}
+
+/*==============================
+BACKGROUND
+==============================*/
+
+@keyframes bgMove{
+
+0%{background-position:0% 50%;}
+25%{background-position:50% 100%;}
+50%{background-position:100% 50%;}
+75%{background-position:50% 0%;}
+100%{background-position:0% 50%;}
+
+}
+
+/*==============================
+TEXT
+==============================*/
+
+.title{
+
+position:absolute;
+
+top:50%;
+
+left:50%;
+
+transform:translate(-50%,-50%);
+
+font-size:80px;
+
+font-weight:bold;
+
+text-transform:uppercase;
+
+color:white;
+
+letter-spacing:8px;
+
+text-align:center;
+
+text-shadow:
+
+0 0 20px white,
+
+0 0 40px cyan,
+
+0 0 60px blue,
+
+0 0 80px lime,
+
+0 0 100px yellow;
+
+animation:textGlow 2s infinite alternate;
+
+z-index:100;
+
+}
+
+.subtitle{
+
+font-size:30px;
+
+margin-top:20px;
+
+letter-spacing:5px;
+
+color:#fff;
+
+text-shadow:0 0 20px yellow;
+
+}
+
+@keyframes textGlow{
+
+0%{
+
+transform:translate(-50%,-50%) scale(1);
+
+}
+
+100%{
+
+transform:translate(-50%,-50%) scale(1.05);
+
+}
+
+}
+
+/*==============================
+SUN
+==============================*/
+
+.sun{
+
+position:absolute;
+
+width:140px;
+
+height:140px;
+
+border-radius:50%;
+
+background:yellow;
+
+top:50px;
+
+right:120px;
+
+box-shadow:
+
+0 0 50px yellow,
+
+0 0 120px orange;
+
+animation:sunPulse 4s infinite;
+
+}
+
+@keyframes sunPulse{
+
+50%{
+
+transform:scale(1.1);
+
+}
+
+}
+
+/*==============================
+CLOUDS
+==============================*/
+
+.cloud{
+
+position:absolute;
+
+background:white;
+
+width:220px;
+
+height:70px;
+
+border-radius:100px;
+
+opacity:.85;
+
+animation:cloudMove linear infinite;
+
+}
+
+.cloud:before{
+
+content:'';
+
+position:absolute;
+
+background:white;
+
+width:110px;
+
+height:110px;
+
+border-radius:50%;
+
+top:-50px;
+
+left:25px;
+
+}
+
+.cloud:after{
+
+content:'';
+
+position:absolute;
+
+background:white;
+
+width:120px;
+
+height:120px;
+
+border-radius:50%;
+
+top:-60px;
+
+right:30px;
+
+}
+
+.c1{
+
+top:80px;
+
+left:-300px;
+
+animation-duration:30s;
+
+}
+
+.c2{
+
+top:160px;
+
+left:-400px;
+
+animation-duration:42s;
+
+animation-delay:5s;
+
+}
+
+.c3{
+
+top:40px;
+
+left:-500px;
+
+animation-duration:52s;
+
+}
+
+@keyframes cloudMove{
+
+from{
+
+transform:translateX(0);
+
+}
+
+to{
+
+transform:translateX(1800px);
+
+}
+
+}
+
+/*==============================
+LIGHTNING
+==============================*/
+
+.flash{
+
+position:absolute;
+
+width:100%;
+
+height:100%;
+
+background:white;
+
+opacity:0;
+
+animation:flash 8s infinite;
+
+pointer-events:none;
+
+}
+
+@keyframes flash{
+
+0%,95%,100%{
+
+opacity:0;
+
+}
+
+96%{
+
+opacity:.8;
+
+}
+
+97%{
+
+opacity:0;
+
+}
+
+98%{
+
+opacity:.6;
+
+}
+
+}
+
+/*==============================
+RAIN
+==============================*/
+
+.rain{
+
+position:absolute;
+
+width:2px;
+
+height:25px;
+
+background:rgba(255,255,255,.7);
+
+animation:rain linear infinite;
+
+}
+
+@keyframes rain{
+
+0%{
+
+transform:translateY(-100vh);
+
+}
+
+100%{
+
+transform:translateY(100vh);
+
+}
+
+}
+
+/*==============================
+HILLS
+==============================*/
+
+.hill{
+
+position:absolute;
+
+bottom:-100px;
+
+border-radius:50%;
+
+background:#2ecc71;
+
+}
+
+.h1{
+
+width:900px;
+
+height:450px;
+
+left:-100px;
+
+}
+
+.h2{
+
+width:700px;
+
+height:350px;
+
+left:500px;
+
+background:#27ae60;
+
+}
+
+.h3{
+
+width:850px;
+
+height:420px;
+
+right:-200px;
+
+background:#1e8449;
+
+}
+
+/*==============================
+FLOWERS
+==============================*/
+
+.flower{
+
+position:absolute;
+
+bottom:120px;
+
+font-size:35px;
+
+animation:flower 3s infinite alternate;
+
+}
+
+@keyframes flower{
+
+100%{
+
+transform:translateY(-10px);
+
+}
+
+}
+
+/*==============================
+BUTTERFLIES
+==============================*/
+
+.butter{
+
+position:absolute;
+
+font-size:28px;
+
+animation:fly 15s linear infinite;
+
+}
+
+@keyframes fly{
+
+0%{
+
+left:-50px;
+
+top:70%;
+
+}
+
+25%{
+
+top:45%;
+
+}
+
+50%{
+
+top:60%;
+
+}
+
+75%{
+
+top:35%;
+
+}
+
+100%{
+
+left:110%;
+
+top:55%;
+
+}
+
+}
+
+/*==============================
+FOG
+==============================*/
+
+.fog{
+
+position:absolute;
+
+bottom:0;
+
+width:250%;
+
+height:180px;
+
+background:rgba(255,255,255,.2);
+
+filter:blur(30px);
+
+animation:fog 20s linear infinite;
+
+}
+
+@keyframes fog{
+
+0%{
+
+transform:translateX(-40%);
+
+}
+
+100%{
+
+transform:translateX(0);
+
+}
+
+}
+
+/*==============================
+FOOTER
+==============================*/
+
+.footer{
+
+position:absolute;
+
+bottom:20px;
+
+width:100%;
+
+text-align:center;
+
+font-size:20px;
+
+color:white;
+
+letter-spacing:3px;
+
+text-shadow:0 0 15px cyan;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="flash"></div>
+
+<div class="sun"></div>
+
+<div class="cloud c1"></div>
+<div class="cloud c2"></div>
+<div class="cloud c3"></div>
+
+<div class="title">
+
+🌧️
+
+<br>
+
+AAYA SAAWAN
+
+<br>
+
+JHOOM KE
+
+<div class="subtitle">
+
+WELCOME TO AZURE KUBERNETES SERVICE
+
+</div>
+
+</div>
+
+<div class="hill h1"></div>
+<div class="hill h2"></div>
+<div class="hill h3"></div>
+
+<div class="flower" style="left:8%">🌼</div>
+<div class="flower" style="left:18%">🌻</div>
+<div class="flower" style="left:30%">🌺</div>
+<div class="flower" style="left:45%">🌸</div>
+<div class="flower" style="left:60%">🌼</div>
+<div class="flower" style="left:75%">🌹</div>
+<div class="flower" style="left:90%">🌻</div>
+
+<div class="butter">🦋</div>
+
+<div class="fog"></div>
+
+<div class="footer">
+
+☁️ Azure Kubernetes Service | Docker | Helm | Ingress | Azure CNI ☁️
+
+</div>
+
+<script>
+
+/*==============================
+RAIN CREATOR
+==============================*/
+
+for(let i=0;i<450;i++){
+
+let rain=document.createElement("div");
+
+rain.className="rain";
+
+rain.style.left=Math.random()*100+"vw";
+
+rain.style.animationDuration=(Math.random()*1+0.5)+"s";
+
+rain.style.animationDelay=Math.random()*2+"s";
+
+rain.style.opacity=Math.random();
+
+document.body.appendChild(rain);
+
+}
+
+/*==============================
+FLOWERS RANDOM
+==============================*/
+
+const flowers=document.querySelectorAll(".flower");
+
+flowers.forEach(f=>{
+
+f.style.animationDuration=(Math.random()*2+2)+"s";
+
+});
+
+/*==============================
+BUTTERFLY RANDOM
+==============================*/
+
+const b=document.querySelector(".butter");
+
+setInterval(()=>{
+
+b.style.top=Math.random()*60+20+"%";
+
+},1500);
+
+</script>
+
+</body>
+</html>
