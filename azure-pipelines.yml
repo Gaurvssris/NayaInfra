@@ -16,6 +16,7 @@ variables:
   dockerfilePath: '$(Build.SourcesDirectory)/independence-day-app/Dockerfile'
   tag: '$(Build.BuildId)'
   resourceGroup: 'RG-Dev'
+  location: 'centralindia'                        # change if your ACR/RG is in a different region
   containerGroup: 'independence-day-app'
   dnsNameLabel: 'independence-day-demo-$(Build.BuildId)'
 
@@ -105,28 +106,53 @@ stages:
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
+                set -e
+
+                echo "Ensuring resource group exists..."
+                az group create \
+                  --name $(resourceGroup) \
+                  --location $(location) \
+                  --output none
+
+                echo "Enabling ACR admin user..."
+                az acr update \
+                  --name $(acrName) \
+                  --admin-enabled true \
+                  --output none
+
+                echo "Fetching ACR password..."
+                ACR_PASSWORD=$(az acr credential show --name $(acrName) --query "passwords[0].value" -o tsv)
+
+                if [ -z "$ACR_PASSWORD" ]; then
+                  echo "##[error]Failed to fetch ACR password"
+                  exit 1
+                fi
+
+                echo "Deleting old container (if exists)..."
                 az container delete \
                   --resource-group $(resourceGroup) \
                   --name $(containerGroup) \
                   --yes || true
 
+                echo "Creating new container instance..."
                 az container create \
                   --resource-group $(resourceGroup) \
                   --name $(containerGroup) \
                   --image $(containerRegistry)/$(imageRepository):$(tag) \
                   --registry-login-server $(containerRegistry) \
                   --registry-username $(acrName) \
-                  --registry-password $(az acr credential show --name $(acrName) --query passwords[0].value -o tsv) \
+                  --registry-password "$ACR_PASSWORD" \
                   --dns-name-label $(dnsNameLabel) \
                   --ports 80 \
                   --os-type Linux \
                   --cpu 1 \
-                  --memory 1.5
+                  --memory 1.5 \
+                  --location $(location)
 
-                echo "Application URL"
-
+                echo "Application URL:"
                 az container show \
                   --resource-group $(resourceGroup) \
                   --name $(containerGroup) \
                   --query ipAddress.fqdn \
                   -o tsv
+
